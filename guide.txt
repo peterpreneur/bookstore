@@ -1,0 +1,80 @@
+The current project is a minimal Spring Boot 4.1.1 / Java 21 skeleton: it has the application entry point and a context-load test, but no API or domain implementation yet. Here’s a sensible order to build the assignment without getting tangled in security and persistence too early.
+
+Write down the API contract first. List each route, its HTTP method, who may call it, its request and response fields, and expected status codes. Include public book list/detail and search, login, authenticated-user operations, and the book-unpublish operation. Decide how the API will choose JSON versus XML: response negotiation normally uses the Accept header, while Content-Type describes the request body. The README calls out this distinction, so make the expected behavior explicit and test it.
+
+Choose the data model and persistence approach. Define a user with a unique username, a stored password hash, and an author pseudonym. Define a book with title, description, author relationship, cover image reference, price, and publication status. Use a decimal-safe money type for price. Treat unpublishing as changing publication status, so the book disappears from public listings without losing its record.
+
+Add the required dependencies and configuration. Extend the minimal dependencies in pom.xml for persistence, validation, security, JWT support, XML serialization, and testing. Choose a database for development and a test database or isolated test setup. Put secrets and database settings in configuration rather than hard-coding them.
+
+Build the persistence layer. Create the user and book entities and repositories. Add a way to find public books and filter them by the search parameters you chose. Check that the schema and relationships work before adding controller behavior.
+
+Add request validation and API payloads. Define separate request and response DTOs rather than exposing persistence entities directly. Validate required fields, reasonable lengths, and price constraints. Ensure responses never include password hashes or other internal fields.
+
+Implement the service layer. Put registration, book management, searching, and ownership rules here. In particular, make the unpublish operation verify that the authenticated author owns the book. Also decide how the bonus rule will work: for example, reject publishing when the author pseudonym or username identifies Darth Vader, and test that rule.
+
+Implement public book endpoints. Add list and detail reads without requiring authentication. Add search query parameters and make sure only published books are returned. Check that unsupported book operations are not accidentally exposed.
+
+Implement user and author operations. Add the authenticated-user CRUD operations and the author’s book-management operations. Keep operations scoped to the current authenticated user; do not let a caller select another user as the owner. Add the unpublish operation as DELETE, while preserving the book as unpublished.
+
+Add login and JWT security. Store passwords using a password-hashing mechanism, authenticate username/password, and return a signed JWT. Configure stateless request authentication, protect write operations, and leave public book reads accessible. Validate token expiration and reject missing, malformed, or invalid tokens.
+
+Support JSON and XML. Configure and verify both response formats. Test the behavior using the agreed negotiation header and confirm the response’s Content-Type matches the selected format. Include request-body format tests if the API accepts XML requests.
+
+Write API tests as you build. The existing BookstoreApplicationTests.java only checks that the application context loads. Add focused API tests for each route: successful and invalid inputs, unauthenticated and authenticated access, search filters, JSON/XML negotiation, JWT failures, and attempts to unpublish another author’s book. Also test that Darth Vader cannot publish.
+
+Run the full checks and try the app end to end. Use the Maven wrapper to compile and run tests, then start the application and exercise the main flows: create an account, log in, publish a book, find it publicly, and unpublish it as its owner. Confirm that another user cannot unpublish it.
+
+A good first milestone is the API contract and endpoint test cases; they’ll make the security and ownership rules concrete before you build the controllers.
+
+src/main/java/com/peterpreneur/bookstore/
+├── BookstoreApplication.java
+├── config/
+│   ├── SecurityConfig.java
+│   └── WebConfig.java                    # JSON/XML content negotiation, if needed
+├── controller/
+│   ├── AuthController.java
+│   ├── BookController.java               # Public list/detail/search
+│   ├── UserController.java                # Authenticated user's profile operations
+│   └── MyBookController.java              # Authenticated author's book operations
+├── dto/
+│   ├── auth/
+│   │   ├── LoginRequest.java
+│   │   └── TokenResponse.java
+│   ├── book/
+│   │   ├── BookResponse.java
+│   │   ├── CreateBookRequest.java
+│   │   └── UpdateBookRequest.java
+│   └── user/
+│       ├── CreateUserRequest.java
+│       ├── UpdateUserRequest.java
+│       └── UserResponse.java
+├── entity/
+│   ├── AppUser.java
+│   ├── Book.java
+│   └── BookStatus.java                    # Optional enum, e.g. published/unpublished
+├── exception/
+│   ├── ApiExceptionHandler.java
+│   └── ResourceNotFoundException.java
+├── repository/
+│   ├── UserRepository.java
+│   └── BookRepository.java
+├── security/
+│   ├── JwtAuthenticationFilter.java
+│   ├── JwtService.java
+│   └── CustomUserDetailsService.java
+└── service/
+    ├── AuthService.java
+    ├── BookService.java
+    └── UserService.java
+
+
+src/test/java/com/peterpreneur/bookstore/
+├── controller/
+│   ├── AuthControllerTest.java
+│   ├── BookControllerTest.java
+│   ├── MyBookControllerTest.java
+│   └── UserControllerTest.java
+├── service/
+│   ├── BookServiceTest.java
+│   └── UserServiceTest.java
+└── BookstoreApplicationTests.java
